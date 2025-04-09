@@ -1,10 +1,11 @@
-// (Khách hàng, tài xế, admin)
 package com.example.demo.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
-import java.util.List;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -39,7 +41,14 @@ public class User {
     public enum Role {
         CUSTOMER, DRIVER, ADMIN
     }
-    // Quan hệ với RideLog (Người dùng có nhiều lịch sử đi lại)
+
+    // Danh sách lịch sử chuyến đi của hành khách
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @JsonManagedReference(value = "user-rideLogs")
     private List<RideLog> rideLogs;
+
+    // Danh sách lịch sử chuyến đi do tài xế thực hiện
+    @OneToMany(mappedBy = "driver", cascade = CascadeType.ALL)
+    @JsonManagedReference(value = "driver-rideLogs")
+    private List<RideLog> drivenLogs;
 }

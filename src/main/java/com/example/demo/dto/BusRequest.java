@@ -7,6 +7,9 @@ import lombok.Setter;
 @Setter
 public class BusRequest {
     private String licensePlate;
+    private String model;
+    private int capacity;
     private String route;
-    private Long driverId;
+    private Long driverId; // ✅ quan trọng
 }
+

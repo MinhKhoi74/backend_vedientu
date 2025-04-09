@@ -18,6 +18,10 @@ public class UserService {
         Optional<User> user = userRepository.findByEmail(email);
         return user.orElse(null);
     }
+    public User getUserById(Long id) {
+        return userRepository.findById(id).orElse(null);
+    }
+    
      // ✅ Lấy tất cả người dùng
      public List<User> getAllUsers() {
         return userRepository.findAll();

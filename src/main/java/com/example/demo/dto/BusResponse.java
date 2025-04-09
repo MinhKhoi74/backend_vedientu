@@ -12,4 +12,5 @@ public class BusResponse {
     private String licensePlate;
     private String route;
     private String driverName;
+    private Long driverId;
 }

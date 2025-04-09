@@ -13,10 +13,14 @@ public class Bus {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)  // ✅ Đảm bảo không trùng biển số xe
+    @Column(unique = true, nullable = false)
     private String licensePlate;
 
     private String model;
     private int capacity;
     private String route;
+
+    @ManyToOne
+    @JoinColumn(name = "driver_id")
+    private User driver;  // ✅ liên kết với tài xế
 }

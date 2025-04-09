@@ -5,11 +5,9 @@ import com.example.demo.entity.Ticket;
 import com.example.demo.entity.User;
 import com.example.demo.service.UserService;
 import com.example.demo.config.JwtUtil;
-import com.example.demo.dto.TicketRequest;
 import com.example.demo.service.QRService;
 import com.example.demo.service.TicketService;
 import com.example.demo.service.RideLogService;
-import com.example.demo.repository.RideLogRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -126,9 +124,10 @@ public ResponseEntity<?> getUserTickets(@RequestHeader("Authorization") String t
     }
 }
 // ✅ API lấy lịch sử chuyến đi của người dùng
-    @Autowired
-    private RideLogService rideLogService; 
-   @GetMapping("/ride-history")
+@Autowired
+private RideLogService rideLogService;
+
+@GetMapping("/ride-history")
 public ResponseEntity<?> getUserRideHistory(@RequestHeader("Authorization") String token) {
     try {
         String jwt = token.replace("Bearer ", "");
@@ -144,12 +143,22 @@ public ResponseEntity<?> getUserRideHistory(@RequestHeader("Authorization") Stri
         List<Map<String, Object>> response = rideLogs.stream().map(rideLog -> {
             Map<String, Object> logData = new HashMap<>();
             logData.put("id", rideLog.getId());
-            logData.put("userId", rideLog.getUser().getId());
-            logData.put("ticketId", rideLog.getTicket().getId());
+
+            // Thêm thông tin tài xế
+            if (rideLog.getDriver() != null) {
+                logData.put("driverId", rideLog.getDriver().getId()); // ID tài xế
+                logData.put("driverName", rideLog.getDriver().getFullName()); // Tên tài xế
+            } else {
+                logData.put("driverId", null); // Nếu không có tài xế
+                logData.put("driverName", "Unknown");
+            }
+
+            // Thêm các thông tin khác
+            logData.put("ticketId", rideLog.getTicketId());
+            logData.put("route", rideLog.getRoute());
             logData.put("rideTime", rideLog.getRideTime());
             logData.put("status", rideLog.getStatus());
-            logData.put("driverName", rideLog.getDriver().getFullName()); // Tên tài xế
-            logData.put("route", rideLog.getRoute()); // Lộ trình
+
             return logData;
         }).toList();
 

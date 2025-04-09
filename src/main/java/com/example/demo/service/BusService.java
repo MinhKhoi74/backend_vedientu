@@ -1,7 +1,9 @@
 package com.example.demo.service;
-
+import com.example.demo.dto.BusRequest;
 import com.example.demo.entity.Bus;
 import com.example.demo.repository.BusRepository;
+import com.example.demo.repository.UserRepository;
+import com.example.demo.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +14,10 @@ public class BusService {
 
     @Autowired
     private BusRepository busRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
     // ✅ Lấy tất cả xe buýt
     public List<Bus> getAllBuses() {
         return busRepository.findAll();
@@ -19,46 +25,54 @@ public class BusService {
 
     // ✅ Lấy thông tin xe buýt theo ID
     public Bus getBusById(Long id) {
-        Optional<Bus> bus = busRepository.findById(id);
-        return bus.orElse(null);
+        return busRepository.findById(id).orElse(null);
     }
+
     // ✅ Thêm xe buýt mới
     public ResponseEntity<?> addBus(Bus bus) {
-        // Kiểm tra nếu biển số đã tồn tại
         if (busRepository.existsByLicensePlate(bus.getLicensePlate())) {
             return ResponseEntity.status(400).body("Biển số xe đã tồn tại!");
         }
-        
+
         busRepository.save(bus);
         return ResponseEntity.ok("Xe buýt đã được thêm thành công!");
     }
-    // ✅ Cập nhật thông tin xe buýt
-    public boolean updateBus(Long id, Bus updatedBus) {
+
+    // ✅ Cập nhật thông tin xe buýt (sửa lại dùng BusRequest)
+    public boolean updateBus(Long id, BusRequest updatedBus) {
         Optional<Bus> existingBus = busRepository.findById(id);
 
         if (existingBus.isPresent()) {
             Bus bus = existingBus.get();
+
             bus.setLicensePlate(updatedBus.getLicensePlate());
             bus.setModel(updatedBus.getModel());
             bus.setCapacity(updatedBus.getCapacity());
             bus.setRoute(updatedBus.getRoute());
 
+            // ✅ Gán lại tài xế nếu driverId tồn tại
+            if (updatedBus.getDriverId() != null) {
+                Optional<User> driver = userRepository.findById(updatedBus.getDriverId());
+                if (driver.isPresent()) {
+                    bus.setDriver(driver.get());
+                } else {
+                    return false; // Tài xế không tồn tại
+                }
+            }
+
             busRepository.save(bus);
             return true;
-        } else {
-            return false;
         }
+
+        return false;
     }
+
     // ✅ Xóa xe buýt theo ID
     public boolean deleteBus(Long id) {
-        Optional<Bus> existingBus = busRepository.findById(id);
-
-        if (existingBus.isPresent()) {
+        if (busRepository.existsById(id)) {
             busRepository.deleteById(id);
             return true;
-        } else {
-            return false;
         }
+        return false;
     }
 }
-

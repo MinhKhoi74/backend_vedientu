@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.BusRequest;
 import com.example.demo.entity.Bus;
 import com.example.demo.entity.User;
 import com.example.demo.service.BusService;
@@ -52,17 +53,35 @@ public class AdminController {
 
     // ✅ API thêm xe buýt
     @PostMapping("/buses")
-    public ResponseEntity<?> addBus(@RequestBody Bus bus) {
-        return busService.addBus(bus);
+    public ResponseEntity<?> addBus(@RequestBody BusRequest request) {
+    // Tìm tài xế
+    User driver = userService.getUserById(request.getDriverId());
+    if (driver == null) {
+        return ResponseEntity.badRequest().body("Không tìm thấy tài xế");
     }
+
+    // Tạo Bus entity từ request
+    Bus bus = new Bus();
+    bus.setLicensePlate(request.getLicensePlate());
+    bus.setModel(request.getModel());
+    bus.setCapacity(request.getCapacity());
+    bus.setRoute(request.getRoute());
+    bus.setDriver(driver); // ✅ gán driver
+
+    return busService.addBus(bus);
+}
+
 
     // ✅ API cập nhật thông tin xe buýt
     @PutMapping("/buses/{id}")
-    public ResponseEntity<?> updateBus(@PathVariable Long id, @RequestBody Bus updatedBus) {
-        boolean isUpdated = busService.updateBus(id, updatedBus);
-        return isUpdated ? ResponseEntity.ok("Cập nhật xe buýt thành công!") 
-                         : ResponseEntity.status(404).body("Không tìm thấy xe buýt!");
-    }
+    public ResponseEntity<?> updateBus(@PathVariable Long id, @RequestBody BusRequest busRequest) {
+    boolean isUpdated = busService.updateBus(id, busRequest);
+
+    return isUpdated
+        ? ResponseEntity.ok("Cập nhật xe buýt thành công!")
+        : ResponseEntity.status(404).body("Không tìm thấy xe buýt hoặc tài xế!");
+}
+
 
     // ✅ API xóa xe buýt
     @DeleteMapping("/buses/{id}")

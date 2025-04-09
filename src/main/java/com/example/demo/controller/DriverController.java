@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.HashMap;
-import java.util.ArrayList;
+
 
 @RestController
 @RequestMapping("/driver")
@@ -32,86 +32,114 @@ public class DriverController {
 
     // ✅ API quét mã QR để kiểm tra vé hợp lệ
     @PostMapping("/scan-qr")
-public ResponseEntity<?> scanQRCode(@RequestHeader("Authorization") String token,
-                                    @RequestBody Map<String, String> qrData) {
-    try {
-        // Xác thực tài xế
-        String jwt = token.replace("Bearer ", "");
-        String driverEmail = jwtUtil.extractEmail(jwt);
-        User driver = userService.findByEmail(driverEmail);
-
-        if (driver == null || !driver.getRole().equals(User.Role.DRIVER)) {
-            return ResponseEntity.status(401).body("Unauthorized");
-        }
-
-        // Lấy dữ liệu từ mã QR
-        String qrContent = qrData.get("qrContent");
-        if (qrContent == null || !qrContent.startsWith("TicketID:")) {
-            return ResponseEntity.badRequest().body("Mã QR không hợp lệ");
-        }
-
-        Long ticketId = Long.parseLong(qrContent.split(": ")[1]);
-        Optional<Ticket> ticketOpt = ticketService.getTicketById(ticketId);
-
-        if (ticketOpt.isEmpty()) {
-            return ResponseEntity.status(400).body("❌ Vé không hợp lệ (không tồn tại)");
-        }
-
-        Ticket ticket = ticketOpt.get();
-
-        if (ticket.getRemainingRides() <= 0) {
-            return ResponseEntity.badRequest().body("❌ Vé đã hết lượt sử dụng");
-        }
-
-        ticket.setRemainingRides(ticket.getRemainingRides() - 1);
-        ticketService.saveTicket(ticket);
-
-        // Thêm thông tin tuyến đường
-        String route = "Hà Nội - Hải Phòng"; // Giả định tuyến đường, có thể lấy từ `ticket`
-
-        // Lưu lịch sử chuyến đi
-        rideLogService.saveRideLog(ticket.getUser(), ticket, driver, route);
-
-        return ResponseEntity.ok("✅ Vé hợp lệ! Hành khách có thể lên xe.");
-    } catch (Exception e) {
-        return ResponseEntity.status(500).body("Lỗi: " + e.getMessage());
-    }
-}
-    @GetMapping("/passengers")
-    public ResponseEntity<?> getPassengers(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<Map<String, Object>> scanQRCode(@RequestHeader("Authorization") String token,
+                                                          @RequestBody Map<String, String> qrData) {
+        Map<String, Object> response = new HashMap<>();
         try {
-            // 🔹 Xác thực tài xế
+            // ✅ Log kiểm tra token & dữ liệu nhận được
+            System.out.println("📌 Token nhận được: " + token);
+            System.out.println("📌 Dữ liệu QR nhận từ Frontend: " + qrData);
+    
+            // ✅ Xác thực tài xế
             String jwt = token.replace("Bearer ", "");
             String driverEmail = jwtUtil.extractEmail(jwt);
             User driver = userService.findByEmail(driverEmail);
-
+    
             if (driver == null || !driver.getRole().equals(User.Role.DRIVER)) {
-                return ResponseEntity.status(401).body("Unauthorized");
+                response.put("success", false);
+                response.put("message", "❌ Tài xế không hợp lệ hoặc chưa đăng nhập");
+                return ResponseEntity.status(401).body(response);
             }
-
-            // 🔹 Lấy danh sách hành khách đã quét vé trên chuyến đi của tài xế
-            List<RideLog> rideLogs = rideLogService.getPassengersByDriver(driver);
-
-            if (rideLogs.isEmpty()) {
-                return ResponseEntity.ok("🚍 Không có hành khách nào trên xe.");
+    
+            // ✅ Kiểm tra dữ liệu QR
+            String qrContent = qrData.get("qrContent");
+            if (qrContent == null || !qrContent.startsWith("TicketID")) {
+                response.put("success", false);
+                response.put("message", "❌ Mã QR không hợp lệ");
+                return ResponseEntity.badRequest().body(response);
             }
-
-            // 🔹 Trả về danh sách hành khách
-            List<Map<String, Object>> response = rideLogs.stream().map(ride -> {
-                Map<String, Object> data = new HashMap<>();
-                data.put("passengerId", ride.getUser().getId());
-                data.put("passengerName", ride.getUser().getFullName());
-                data.put("ticketId", ride.getTicket().getId());
-                data.put("rideTime", ride.getRideTime());
-                data.put("status", ride.getStatus());
-                data.put("route", ride.getRoute()); // Lộ trình
-                return data;
-            }).toList();
-
+    
+            // ✅ Định dạng ID vé
+            String[] parts = qrContent.split(":");
+            if (parts.length < 2) {
+                response.put("success", false);
+                response.put("message", "❌ Mã QR không đúng định dạng");
+                return ResponseEntity.badRequest().body(response);
+            }
+    
+            Long ticketId = Long.parseLong(parts[1].trim());
+            Optional<Ticket> ticketOpt = ticketService.getTicketById(ticketId);
+    
+            if (ticketOpt.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "❌ Vé không tồn tại");
+                return ResponseEntity.status(400).body(response);
+            }
+    
+            Ticket ticket = ticketOpt.get();
+            if (ticket.getRemainingRides() <= 0) {
+                response.put("success", false);
+                response.put("message", "❌ Vé đã hết lượt sử dụng");
+                return ResponseEntity.badRequest().body(response);
+            }
+    
+            // ✅ Trừ số lượt sử dụng
+            ticket.setRemainingRides(ticket.getRemainingRides() - 1);
+            ticketService.saveTicket(ticket);
+    
+            // ✅ Lưu lịch sử chuyến đi
+            String route = "Hà Nội - Hải Phòng";
+            rideLogService.saveRideLog(ticket.getUser(), ticket, driver, route);
+    
+            response.put("success", true);
+            response.put("message", "✅ Vé hợp lệ! Hành khách có thể lên xe.");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Lỗi: " + e.getMessage());
+            response.put("success", false);
+            response.put("message", "❌ Lỗi hệ thống: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
         }
     }
+    
+    @GetMapping("/ride-history")
+public ResponseEntity<?> getUserRideHistory(@RequestHeader("Authorization") String token) {
+    try {
+        String jwt = token.replace("Bearer ", "");
+        String email = jwtUtil.extractEmail(jwt);
+        User user = userService.findByEmail(email);
 
+        if (user == null) {
+            return ResponseEntity.status(404).body("User not found");
+        }
+
+        List<RideLog> rideLogs = rideLogService.getRideLogsByUser(user);
+
+        List<Map<String, Object>> response = rideLogs.stream().map(rideLog -> {
+            Map<String, Object> logData = new HashMap<>();
+            logData.put("id", rideLog.getId());
+
+            // Thêm thông tin tài xế
+            if (rideLog.getDriver() != null) {
+                logData.put("driverId", rideLog.getDriver().getId()); // ID tài xế
+                logData.put("driverName", rideLog.getDriver().getFullName()); // Tên tài xế
+            } else {
+                logData.put("driverId", null); // Nếu không có tài xế
+                logData.put("driverName", "Unknown");
+            }
+
+            // Thêm các thông tin khác
+            logData.put("ticketId", rideLog.getTicketId());
+            logData.put("route", rideLog.getRoute());
+            logData.put("rideTime", rideLog.getRideTime());
+            logData.put("status", rideLog.getStatus());
+
+            return logData;
+        }).toList();
+
+        return ResponseEntity.ok(response);
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body("Lỗi khi lấy lịch sử chuyến đi: " + e.getMessage());
+    }
+}
+    
 }
