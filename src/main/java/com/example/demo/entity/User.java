@@ -41,7 +41,10 @@ public class User {
     public enum Role {
         CUSTOMER, DRIVER, ADMIN
     }
-
+    
+    @OneToOne(mappedBy = "driver", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Bus bus;
+    
     // Danh sách lịch sử chuyến đi của hành khách
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @JsonManagedReference(value = "user-rideLogs")

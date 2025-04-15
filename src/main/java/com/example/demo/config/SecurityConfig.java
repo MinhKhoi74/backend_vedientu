@@ -71,13 +71,13 @@ public class SecurityConfig {
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/user/**").authenticated() 
                 // Khách hàng (CUSTOMER) - Mua vé, xem lịch sử, lấy mã QR
-                .requestMatchers("/user/buy-ticket", "/tickets/my-tickets", "/qr/**", "/transactions/my-history").hasRole("CUSTOMER")
+                .requestMatchers("/user/buy-ticket", "/tickets/my-tickets", "/qr/**", "user/transactions").hasRole("CUSTOMER")
 
                 // Tài xế (DRIVER) - Quét mã QR, xác nhận vé, xem danh sách hành khách
                 .requestMatchers("/driver/scan-qr","/driver/passengers").hasRole("DRIVER")
 
                 // Admin (ADMIN) - Quản lý tài khoản, xe buýt, vé, báo cáo
-                .requestMatchers("/admin/buses", "/reports/**","/admin/users/**").hasRole("ADMIN")
+                .requestMatchers("/admin/buses", "/reports/**","/admin/users/**","/transactions").hasRole("ADMIN")
 
                 // Yêu cầu xác thực với tất cả API còn lại
                 .anyRequest().authenticated()

@@ -5,6 +5,7 @@ import com.example.demo.entity.Ticket;
 import com.example.demo.entity.User;
 import com.example.demo.service.UserService;
 import com.example.demo.config.JwtUtil;
+import com.example.demo.dto.RideLogResponse;
 import com.example.demo.service.QRService;
 import com.example.demo.service.TicketService;
 import com.example.demo.service.RideLogService;
@@ -155,9 +156,18 @@ public ResponseEntity<?> getUserRideHistory(@RequestHeader("Authorization") Stri
 
             // Thêm các thông tin khác
             logData.put("ticketId", rideLog.getTicketId());
-            logData.put("route", rideLog.getRoute());
+            if (rideLog.getBus() != null) {
+                logData.put("busId", rideLog.getBus().getId()); 
+                logData.put("route", rideLog.getRoute());
+            } else {
+                logData.put("busId", null);
+                logData.put("route", "Unknown");
+
+            }
             logData.put("rideTime", rideLog.getRideTime());
             logData.put("status", rideLog.getStatus());
+            logData.put("userName", rideLog.getUserName());
+            logData.put("busCode", rideLog.getBusCode());
 
             return logData;
         }).toList();
@@ -167,5 +177,21 @@ public ResponseEntity<?> getUserRideHistory(@RequestHeader("Authorization") Stri
         return ResponseEntity.status(500).body("Lỗi khi lấy lịch sử chuyến đi: " + e.getMessage());
     }
 }
+// chi tiết chuyến đi của người dùng
+@GetMapping("/ride-history/{rideLogId}")
+public ResponseEntity<?> getRideLogDetail(
+        @PathVariable Long rideLogId,
+        @RequestHeader("Authorization") String token) {
+    try {
+        RideLogResponse rideLog = rideLogService.getRideLogDetailForUser(rideLogId, token);
+        if (rideLog == null) {
+            return ResponseEntity.status(404).body("Chuyến đi không tồn tại hoặc không thuộc về bạn");
+        }
+        return ResponseEntity.ok(rideLog);
+    } catch (Exception e) {
+        return ResponseEntity.status(400).body("Lỗi khi lấy chi tiết chuyến đi: " + e.getMessage());
+    }
+}
+
 
 }

@@ -8,19 +8,39 @@ import java.math.BigDecimal;
 
 public interface ReportRepository extends JpaRepository<Transaction, Long> {
 
-    // Tính tổng doanh thu từ giao dịch hoàn thành
+    // Tổng doanh thu từ giao dịch hoàn thành
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.status = 'COMPLETED'")
     BigDecimal getTotalRevenue();
 
-    // Đếm tổng số lượt quét vé hợp lệ
+    // Tổng lượt quét vé hợp lệ
     @Query("SELECT COUNT(r.id) FROM RideLog r WHERE r.status = 'VALID'")
     Long getTotalRides();
 
-    // Đếm tổng số vé loại SINGLE
+    // Tổng số vé loại SINGLE
     @Query("SELECT COUNT(t.id) FROM Ticket t WHERE t.ticketType = 'SINGLE'")
     Long getTotalSingleTickets();
 
-    // Đếm tổng số vé loại MONTHLY
+    // Tổng số vé loại MONTHLY
     @Query("SELECT COUNT(t.id) FROM Ticket t WHERE t.ticketType = 'MONTHLY'")
     Long getTotalMonthlyTickets();
+
+    // Tổng số vé loại VIP
+    @Query("SELECT COUNT(t.id) FROM Ticket t WHERE t.ticketType = 'VIP'")
+    Long getTotalVipTickets();
+
+    // Tổng người dùng
+    @Query("SELECT COUNT(u.id) FROM User u")
+    Long getTotalUsers();
+
+    // Tổng CUSTOMER
+    @Query("SELECT COUNT(u.id) FROM User u WHERE u.role = 'CUSTOMER'")
+    Long getTotalCustomers();
+
+    // Tổng DRIVER
+    @Query("SELECT COUNT(u.id) FROM User u WHERE u.role = 'DRIVER'")
+    Long getTotalDrivers();
+
+    // Tổng ADMIN
+    @Query("SELECT COUNT(u.id) FROM User u WHERE u.role = 'ADMIN'")
+    Long getTotalAdmins();
 }

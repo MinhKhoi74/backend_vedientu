@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.entity.Ticket;
 import com.example.demo.entity.User;
+import com.example.demo.entity.Bus;
 import com.example.demo.entity.RideLog;
 import com.example.demo.service.TicketService;
 import com.example.demo.service.UserService;
@@ -88,8 +89,8 @@ public class DriverController {
             ticketService.saveTicket(ticket);
     
             // ✅ Lưu lịch sử chuyến đi
-            String route = "Hà Nội - Hải Phòng";
-            rideLogService.saveRideLog(ticket.getUser(), ticket, driver, route);
+            Bus bus = driver.getBus();
+            rideLogService.saveRideLog(ticket.getUser(), ticket, driver, bus);
     
             response.put("success", true);
             response.put("message", "✅ Vé hợp lệ! Hành khách có thể lên xe.");

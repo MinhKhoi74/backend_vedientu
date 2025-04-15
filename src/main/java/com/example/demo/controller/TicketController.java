@@ -1,7 +1,9 @@
 package com.example.demo.controller;
 
 import com.example.demo.entity.Ticket;
+import com.example.demo.entity.Transaction;
 import com.example.demo.entity.User;
+import com.example.demo.repository.TransactionRepository;
 import com.example.demo.service.TicketService;
 import com.example.demo.service.UserService;
 import com.example.demo.config.JwtUtil;
@@ -11,7 +13,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/user")
@@ -26,41 +31,54 @@ public class TicketController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    // ✅ API mua vé
+    @Autowired
+    private TransactionRepository transactionRepository; // ✅ Thêm repo giao dịch
+
+    // ✅ API mua vé và lưu lịch sử giao dịch
     @PostMapping("/buy-ticket")
-public ResponseEntity<?> buyTicket(@RequestHeader("Authorization") String token,
-                                   @RequestBody TicketRequest request) {
-    String jwt = token.replace("Bearer ", "");
-    String email = jwtUtil.extractEmail(jwt);
-    User user = userService.findByEmail(email);
+    public ResponseEntity<?> buyTicket(@RequestHeader("Authorization") String token,
+                                       @RequestBody TicketRequest request) {
+        String jwt = token.replace("Bearer ", "");
+        String email = jwtUtil.extractEmail(jwt);
+        User user = userService.findByEmail(email);
 
-    if (user == null) {
-        return ResponseEntity.status(404).body("User not found");
+        if (user == null) {
+            return ResponseEntity.status(404).body("User not found");
+        }
+
+        if (request.getTicketType() == null || request.getTicketType().isBlank()) {
+            return ResponseEntity.status(400).body("Loại vé không được để trống!");
+        }
+
+        Ticket.TicketType ticketType;
+        try {
+            ticketType = Ticket.TicketType.valueOf(request.getTicketType().toUpperCase().trim());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(400).body("Loại vé không hợp lệ!");
+        }
+
+        // ✅ Mua vé
+        Ticket ticket = ticketService.buyTicket(user, ticketType);
+        String qrBase64 = ticketService.getTicketQRCode(ticket);
+
+        // ✅ Lưu lịch sử giao dịch
+        Transaction transaction = Transaction.builder()
+                .user(user)
+                .ticket(ticket)
+                .amount(BigDecimal.valueOf(ticket.getPrice()))
+                .paymentMethod(Transaction.PaymentMethod.CASH) // Có thể lấy từ request
+                .status(Transaction.Status.COMPLETED)
+                .transactionDate(LocalDateTime.now())
+                .build();
+        transactionRepository.save(transaction);
+
+        return ResponseEntity.ok(Map.of(
+            "message", "Mua vé thành công!",
+            "ticketId", ticket.getId(),
+            "qrCode", qrBase64
+        ));
     }
 
-    // ✅ Kiểm tra null trước khi gọi toUpperCase()
-    if (request.getTicketType() == null || request.getTicketType().isBlank()) {
-        return ResponseEntity.status(400).body("Loại vé không được để trống!");
-    }
-
-    Ticket.TicketType ticketType;
-    try {
-        ticketType = Ticket.TicketType.valueOf(request.getTicketType().toUpperCase().trim());
-    } catch (IllegalArgumentException e) {
-        return ResponseEntity.status(400).body("Loại vé không hợp lệ!");
-    }
-
-    Ticket ticket = ticketService.buyTicket(user, ticketType);
-    String qrBase64 = ticketService.getTicketQRCode(ticket);
-
-    return ResponseEntity.ok(Map.of(
-        "message", "Mua vé thành công!",
-        "ticketId", ticket.getId(),
-        "qrCode", qrBase64
-    ));
-}
-
-    
     // ✅ API lấy chi tiết vé + mã QR
     @GetMapping("/tickets/{ticketId}")
     public ResponseEntity<?> getTicketDetails(@RequestHeader("Authorization") String token,
@@ -95,29 +113,30 @@ public ResponseEntity<?> buyTicket(@RequestHeader("Authorization") String token,
             "qrCode", qrBase64
         ));
     }
+
+    // ✅ API hủy vé
     @DeleteMapping("/tickets/{ticketId}")
-public ResponseEntity<?> cancelTicket(@RequestHeader("Authorization") String token,
-                                      @PathVariable Long ticketId) {
-    String jwt = token.replace("Bearer ", "");
-    String email = jwtUtil.extractEmail(jwt);
-    User user = userService.findByEmail(email);
+    public ResponseEntity<?> cancelTicket(@RequestHeader("Authorization") String token,
+                                          @PathVariable Long ticketId) {
+        String jwt = token.replace("Bearer ", "");
+        String email = jwtUtil.extractEmail(jwt);
+        User user = userService.findByEmail(email);
 
-    if (user == null) {
-        return ResponseEntity.status(404).body("Người dùng không tồn tại!");
+        if (user == null) {
+            return ResponseEntity.status(404).body("Người dùng không tồn tại!");
+        }
+
+        Optional<Ticket> ticketOpt = ticketService.getTicketById(ticketId);
+        if (ticketOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Vé không tồn tại!");
+        }
+
+        Ticket ticket = ticketOpt.get();
+        if (!ticket.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).body("Bạn không có quyền hủy vé này!");
+        }
+
+        ticketService.deleteTicket(ticketId);
+        return ResponseEntity.ok("Vé đã được hủy thành công!");
     }
-
-    Optional<Ticket> ticketOpt = ticketService.getTicketById(ticketId);
-    if (ticketOpt.isEmpty()) {
-        return ResponseEntity.status(404).body("Vé không tồn tại!");
-    }
-
-    Ticket ticket = ticketOpt.get();
-    if (!ticket.getUser().getId().equals(user.getId())) {
-        return ResponseEntity.status(403).body("Bạn không có quyền hủy vé này!");
-    }
-
-    ticketService.deleteTicket(ticketId);
-    return ResponseEntity.ok("Vé đã được hủy thành công!");
-}
-
 }

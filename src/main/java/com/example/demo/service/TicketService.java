@@ -10,6 +10,7 @@ import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.util.UUID;
 import java.util.Date;
 import java.util.List;
@@ -52,16 +53,12 @@ public class TicketService {
         return ticketRepository.findByUser(user);
     }
 
-    // ✅ Lấy mã QR của vé dưới dạng hình ảnh Base64 (Dùng ZXing)
+    // ✅ Lấy mã QR của vé dưới dạng hình ảnh Base64
     public String getTicketQRCode(Ticket ticket) {
         try {
             QRCodeWriter qrCodeWriter = new QRCodeWriter();
             BitMatrix bitMatrix = qrCodeWriter.encode(ticket.getQrCode(), BarcodeFormat.QR_CODE, 250, 250);
-
-            // ✅ Chuyển BitMatrix thành hình ảnh QR
             BufferedImage qrImage = MatrixToImageWriter.toBufferedImage(bitMatrix);
-            
-            // ✅ Chuyển ảnh QR thành Base64
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(qrImage, "png", baos);
             return Base64.getEncoder().encodeToString(baos.toByteArray());
@@ -70,36 +67,38 @@ public class TicketService {
         }
     }
 
-    // ✅ Định nghĩa giá vé theo loại
+    // ✅ Giá vé theo loại
     private double getPriceByType(Ticket.TicketType type) {
         return switch (type) {
-            case STANDARD -> 50.0;
-            case VIP -> 100.0;
-            case STUDENT -> 30.0;
+            case SINGLE -> 6000.0;
+            case VIP -> 50000.0;
+            case MONTHLY -> 200000.0;
         };
     }
 
-    // ✅ Định nghĩa số lượt sử dụng theo loại vé
+    // ✅ Số lượt sử dụng theo loại
     private int getRidesByType(Ticket.TicketType type) {
         return switch (type) {
-            case STANDARD -> 10;
-            case VIP -> 20;
-            case STUDENT -> 15;
+            case SINGLE -> 1;
+            case VIP -> 10;
+            case MONTHLY -> Integer.MAX_VALUE; // biểu thị "không giới hạn"
         };
     }
 
-    // ✅ Định nghĩa ngày hết hạn
+    // ✅ Ngày hết hạn mặc định là 30 ngày kể từ ngày mua
     private Date getExpiryDate() {
         Date expiry = new Date();
         expiry.setTime(expiry.getTime() + (30L * 24 * 60 * 60 * 1000)); // 30 ngày
         return expiry;
     }
-    // ✅ Lưu vé sau khi cập nhật (giảm số lượt sử dụng)
+
+    // ✅ Cập nhật vé (giảm lượt sử dụng, v.v.)
     public Ticket saveTicket(Ticket ticket) {
         return ticketRepository.save(ticket);
     }
+
+    // ✅ Xóa vé
     public void deleteTicket(Long ticketId) {
         ticketRepository.deleteById(ticketId);
     }
-    
 }

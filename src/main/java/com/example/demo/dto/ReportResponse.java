@@ -14,4 +14,10 @@ public class ReportResponse {
     private Long totalRides;
     private Long totalSingleTickets;
     private Long totalMonthlyTickets;
+    private Long totalVipTickets;
+
+    private Long totalUsers;
+    private Long totalCustomers;
+    private Long totalDrivers;
+    private Long totalAdmins;
 }

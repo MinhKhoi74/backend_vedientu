@@ -19,7 +19,7 @@ public class RideLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.DETACH)
+    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.DETACH)
     @JoinColumn(name = "user_id", nullable = true)
     @JsonBackReference(value = "user-rideLogs")
     private User user; // Hành khách sử dụng vé
@@ -27,17 +27,26 @@ public class RideLog {
     @Column(name = "ticket_id", nullable = true)
     private Long ticketId; // ID của vé đã sử dụng
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.DETACH)
+    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.DETACH)
     @JoinColumn(name = "driver_id", nullable = true)
     @JsonBackReference(value = "driver-rideLogs")
     private User driver; // Tài xế quét vé
 
-    private String route; // Lộ trình từ đâu đến đâu
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "bus_id")
+    private Bus bus;
+
+    @Column(name = "route")
+    private String route;
 
     private LocalDateTime rideTime;
 
     @Enumerated(EnumType.STRING)
     private Status status; // VALID / INVALID
+
+    private String userName;
+
+    private String busCode;
 
     public enum Status {
         VALID, INVALID

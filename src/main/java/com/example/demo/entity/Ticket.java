@@ -8,7 +8,7 @@ import java.util.Date;
 public class Ticket {
 
     public enum TicketType {
-        STANDARD, VIP, STUDENT
+        SINGLE, VIP, MONTHLY
     }
 
     @Id
@@ -20,6 +20,7 @@ public class Ticket {
     private User user;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "ticket_type")
     private TicketType ticketType;
 
     private double price;
