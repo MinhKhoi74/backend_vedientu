@@ -101,6 +101,55 @@ public class DriverController {
             return ResponseEntity.status(500).body(response);
         }
     }
+
+    // ✅ API lấy danh sách hành khách của tài xế
+    @GetMapping("/passengers")
+    public ResponseEntity<Map<String, Object>> getPassengers(@RequestHeader("Authorization") String token) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // 🔹 Xác thực tài xế
+            String jwt = token.replace("Bearer ", "");
+            String driverEmail = jwtUtil.extractEmail(jwt);
+            User driver = userService.findByEmail(driverEmail);
+
+            if (driver == null || !driver.getRole().equals(User.Role.DRIVER)) {
+                response.put("success", false);
+                response.put("message", "❌ Tài xế không hợp lệ hoặc chưa đăng nhập");
+                return ResponseEntity.status(401).body(response);
+            }
+
+            // 🔹 Lấy danh sách hành khách đã quét vé trên chuyến đi của tài xế
+            List<RideLog> rideLogs = rideLogService.getPassengersByDriver(driver);
+
+            if (rideLogs.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "🚍 Không có hành khách nào trên xe.");
+                return ResponseEntity.ok(response);
+            }
+
+            // 🔹 Trả về danh sách hành khách
+            List<Map<String, Object>> passengerList = rideLogs.stream().map(ride -> {
+                Map<String, Object> passengerData = new HashMap<>();
+                passengerData.put("passengerId", ride.getUser().getId());
+                passengerData.put("passengerName", ride.getUser().getFullName());
+                passengerData.put("ticketId", ride.getTicketId());
+                passengerData.put("rideTime", ride.getRideTime());
+                passengerData.put("status", ride.getStatus());
+                passengerData.put("route", ride.getRoute()); // Lộ trình
+                return passengerData;
+            }).toList();
+
+            response.put("success", true);
+            response.put("passengers", passengerList);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "❌ Lỗi hệ thống: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+
     
     @GetMapping("/ride-history")
 public ResponseEntity<?> getUserRideHistory(@RequestHeader("Authorization") String token) {
