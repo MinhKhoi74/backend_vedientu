@@ -32,7 +32,7 @@ public class TicketController {
     private JwtUtil jwtUtil;
 
     @Autowired
-    private TransactionRepository transactionRepository; // ✅ Thêm repo giao dịch
+    private TransactionRepository transactionRepository;
 
     // ✅ API mua vé và lưu lịch sử giao dịch
     @PostMapping("/buy-ticket")
@@ -57,8 +57,11 @@ public class TicketController {
             return ResponseEntity.status(400).body("Loại vé không hợp lệ!");
         }
 
-        // ✅ Mua vé
+        // ✅ Mua vé (set isHidden = false mặc định)
         Ticket ticket = ticketService.buyTicket(user, ticketType);
+        ticket.setIsHidden(false); // ✅ Mặc định hiển thị
+        ticketService.saveTicket(ticket); // ✅ Lưu trạng thái
+
         String qrBase64 = ticketService.getTicketQRCode(ticket);
 
         // ✅ Lưu lịch sử giao dịch
@@ -114,29 +117,32 @@ public class TicketController {
         ));
     }
 
-    // ✅ API hủy vé
-    @DeleteMapping("/tickets/{ticketId}")
-    public ResponseEntity<?> cancelTicket(@RequestHeader("Authorization") String token,
-                                          @PathVariable Long ticketId) {
-        String jwt = token.replace("Bearer ", "");
-        String email = jwtUtil.extractEmail(jwt);
-        User user = userService.findByEmail(email);
+    // ✅ API ẩn vé (hủy vé)
+    @PutMapping("/tickets/{ticketId}/cancel")
+public ResponseEntity<?> cancelTicket(@RequestHeader("Authorization") String token,
+                                      @PathVariable Long ticketId) {
+    String jwt = token.replace("Bearer ", "");
+    String email = jwtUtil.extractEmail(jwt);
+    User user = userService.findByEmail(email);
 
-        if (user == null) {
-            return ResponseEntity.status(404).body("Người dùng không tồn tại!");
-        }
-
-        Optional<Ticket> ticketOpt = ticketService.getTicketById(ticketId);
-        if (ticketOpt.isEmpty()) {
-            return ResponseEntity.status(404).body("Vé không tồn tại!");
-        }
-
-        Ticket ticket = ticketOpt.get();
-        if (!ticket.getUser().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body("Bạn không có quyền hủy vé này!");
-        }
-
-        ticketService.deleteTicket(ticketId);
-        return ResponseEntity.ok("Vé đã được hủy thành công!");
+    if (user == null) {
+        return ResponseEntity.status(404).body("Người dùng không tồn tại!");
     }
+
+    Optional<Ticket> ticketOpt = ticketService.getTicketById(ticketId);
+    if (ticketOpt.isEmpty()) {
+        return ResponseEntity.status(404).body("Vé không tồn tại!");
+    }
+
+    Ticket ticket = ticketOpt.get();
+    if (!ticket.getUser().getId().equals(user.getId())) {
+        return ResponseEntity.status(403).body("Bạn không có quyền hủy vé này!");
+    }
+
+    ticket.setIsHidden(true); // Ẩn vé
+    ticketService.saveTicket(ticket); // Cập nhật DB
+
+    return ResponseEntity.ok("Vé đã được ẩn thành công!");
+}
+
 }

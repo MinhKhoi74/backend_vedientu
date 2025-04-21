@@ -43,4 +43,5 @@ public interface ReportRepository extends JpaRepository<Transaction, Long> {
     // Tổng ADMIN
     @Query("SELECT COUNT(u.id) FROM User u WHERE u.role = 'ADMIN'")
     Long getTotalAdmins();
+   
 }

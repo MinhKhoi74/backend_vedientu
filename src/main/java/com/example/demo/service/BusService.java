@@ -39,33 +39,41 @@ public class BusService {
     }
 
     // ✅ Cập nhật thông tin xe buýt (sửa lại dùng BusRequest)
-    public boolean updateBus(Long id, BusRequest updatedBus) {
-        Optional<Bus> existingBus = busRepository.findById(id);
+public boolean updateBus(Long id, BusRequest updatedBus) {
+    Optional<Bus> existingBus = busRepository.findById(id);
 
-        if (existingBus.isPresent()) {
-            Bus bus = existingBus.get();
+    if (existingBus.isPresent()) {
+        Bus bus = existingBus.get();
 
-            bus.setLicensePlate(updatedBus.getLicensePlate());
-            bus.setModel(updatedBus.getModel());
-            bus.setCapacity(updatedBus.getCapacity());
-            bus.setRoute(updatedBus.getRoute());
-
-            // ✅ Gán lại tài xế nếu driverId tồn tại
-            if (updatedBus.getDriverId() != null) {
-                Optional<User> driver = userRepository.findById(updatedBus.getDriverId());
-                if (driver.isPresent()) {
-                    bus.setDriver(driver.get());
-                } else {
-                    return false; // Tài xế không tồn tại
-                }
-            }
-
-            busRepository.save(bus);
-            return true;
+        // ✅ Kiểm tra biển số trùng với xe khác
+        String newPlate = updatedBus.getLicensePlate();
+        if (!bus.getLicensePlate().equals(newPlate) && busRepository.existsByLicensePlate(newPlate)) {
+            return false; // Biển số mới đã tồn tại cho xe khác
         }
 
-        return false;
+        // ✅ Cập nhật thông tin
+        bus.setLicensePlate(newPlate);
+        bus.setModel(updatedBus.getModel());
+        bus.setCapacity(updatedBus.getCapacity());
+        bus.setRoute(updatedBus.getRoute());
+
+        // ✅ Gán lại tài xế nếu driverId tồn tại
+        if (updatedBus.getDriverId() != null) {
+            Optional<User> driver = userRepository.findById(updatedBus.getDriverId());
+            if (driver.isPresent()) {
+                bus.setDriver(driver.get());
+            } else {
+                return false; // Tài xế không tồn tại
+            }
+        }
+
+        busRepository.save(bus);
+        return true;
     }
+
+    return false;
+}
+
 
     // ✅ Xóa xe buýt theo ID
     public boolean deleteBus(Long id) {

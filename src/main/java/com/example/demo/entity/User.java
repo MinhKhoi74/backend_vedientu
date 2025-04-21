@@ -43,6 +43,7 @@ public class User {
     }
     
     @OneToOne(mappedBy = "driver", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference
     private Bus bus;
     
     // Danh sách lịch sử chuyến đi của hành khách

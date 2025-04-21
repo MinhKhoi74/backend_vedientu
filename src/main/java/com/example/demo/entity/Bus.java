@@ -1,5 +1,7 @@
 package com.example.demo.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -20,7 +22,9 @@ public class Bus {
     private int capacity;
     private String route;
 
-    @ManyToOne
-    @JoinColumn(name = "driver_id")
-    private User driver;  // ✅ liên kết với tài xế
+    @OneToOne
+    @JoinColumn(name = "driver_id", referencedColumnName = "id")
+    @JsonBackReference
+    private User driver;
+
 }

@@ -29,6 +29,9 @@ public class Ticket {
     private Date purchaseDate;
     private Date expiryDate;
 
+    @Column(name = "is_hidden")
+    private Boolean isHidden = false; // ✅ Thêm cờ ẩn vé khi bị hủy
+
     // Getters and Setters
     public Long getId() {
         return id;
@@ -93,5 +96,12 @@ public class Ticket {
     public void setExpiryDate(Date expiryDate) {
         this.expiryDate = expiryDate;
     }
-    
+
+    public Boolean getIsHidden() {
+        return isHidden;
+    }
+
+    public void setIsHidden(Boolean hidden) {
+        isHidden = hidden;
+    }
 }

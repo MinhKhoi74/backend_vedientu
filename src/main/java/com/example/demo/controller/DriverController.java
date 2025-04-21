@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.entity.Ticket;
+import com.example.demo.entity.Trip;
 import com.example.demo.entity.User;
 import com.example.demo.entity.Bus;
 import com.example.demo.entity.RideLog;
@@ -11,12 +12,11 @@ import com.example.demo.config.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.HashMap;
-
-
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import com.example.demo.service.TripService;
 @RestController
 @RequestMapping("/driver")
 public class DriverController {
@@ -26,22 +26,22 @@ public class DriverController {
 
     @Autowired
     private RideLogService rideLogService;
+
     @Autowired
     private UserService userService;
+
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private TripService tripService;
+    
     // ✅ API quét mã QR để kiểm tra vé hợp lệ
     @PostMapping("/scan-qr")
     public ResponseEntity<Map<String, Object>> scanQRCode(@RequestHeader("Authorization") String token,
                                                           @RequestBody Map<String, String> qrData) {
         Map<String, Object> response = new HashMap<>();
         try {
-            // ✅ Log kiểm tra token & dữ liệu nhận được
-            System.out.println("📌 Token nhận được: " + token);
-            System.out.println("📌 Dữ liệu QR nhận từ Frontend: " + qrData);
-    
-            // ✅ Xác thực tài xế
             String jwt = token.replace("Bearer ", "");
             String driverEmail = jwtUtil.extractEmail(jwt);
             User driver = userService.findByEmail(driverEmail);
@@ -52,7 +52,6 @@ public class DriverController {
                 return ResponseEntity.status(401).body(response);
             }
     
-            // ✅ Kiểm tra dữ liệu QR
             String qrContent = qrData.get("qrContent");
             if (qrContent == null || !qrContent.startsWith("TicketID")) {
                 response.put("success", false);
@@ -60,7 +59,6 @@ public class DriverController {
                 return ResponseEntity.badRequest().body(response);
             }
     
-            // ✅ Định dạng ID vé
             String[] parts = qrContent.split(":");
             if (parts.length < 2) {
                 response.put("success", false);
@@ -84,13 +82,22 @@ public class DriverController {
                 return ResponseEntity.badRequest().body(response);
             }
     
-            // ✅ Trừ số lượt sử dụng
+            // ✅ Thêm mới: kiểm tra chuyến đang mở của tài xế
+            Optional<Trip> openTrip = rideLogService.getOpenTripByDriver(driver);
+            if (openTrip.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "❌ Không có chuyến đang mở. Vui lòng mở chuyến trước.");
+                return ResponseEntity.badRequest().body(response);
+            }
+    
+            // ✅ Trừ lượt sử dụng vé
             ticket.setRemainingRides(ticket.getRemainingRides() - 1);
             ticketService.saveTicket(ticket);
     
-            // ✅ Lưu lịch sử chuyến đi
             Bus bus = driver.getBus();
-            rideLogService.saveRideLog(ticket.getUser(), ticket, driver, bus);
+    
+            // ✅ Lưu nhật ký lên xe có chuyến
+            rideLogService.saveRideLog(ticket.getUser(), ticket, driver, bus, openTrip.get());
     
             response.put("success", true);
             response.put("message", "✅ Vé hợp lệ! Hành khách có thể lên xe.");
@@ -101,33 +108,42 @@ public class DriverController {
             return ResponseEntity.status(500).body(response);
         }
     }
+    
 
     // ✅ API lấy danh sách hành khách của tài xế
     @GetMapping("/passengers")
-    public ResponseEntity<Map<String, Object>> getPassengers(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<Map<String, Object>> getPassengersByTrip(
+            @RequestHeader("Authorization") String token,
+            @RequestParam("tripId") Long tripId) {
+    
         Map<String, Object> response = new HashMap<>();
         try {
-            // 🔹 Xác thực tài xế
             String jwt = token.replace("Bearer ", "");
             String driverEmail = jwtUtil.extractEmail(jwt);
             User driver = userService.findByEmail(driverEmail);
-
+    
             if (driver == null || !driver.getRole().equals(User.Role.DRIVER)) {
                 response.put("success", false);
                 response.put("message", "❌ Tài xế không hợp lệ hoặc chưa đăng nhập");
                 return ResponseEntity.status(401).body(response);
             }
-
-            // 🔹 Lấy danh sách hành khách đã quét vé trên chuyến đi của tài xế
-            List<RideLog> rideLogs = rideLogService.getPassengersByDriver(driver);
-
+    
+            // Lấy chuyến đi theo ID
+            Trip trip = tripService.findById(tripId); // bạn cần có tripService.findById()
+    
+            if (trip == null || !trip.getDriver().getId().equals(driver.getId())) {
+                response.put("success", false);
+                response.put("message", "❌ Không tìm thấy chuyến hoặc không thuộc quyền truy cập.");
+                return ResponseEntity.status(403).body(response);
+            }
+    
+            List<RideLog> rideLogs = rideLogService.getRideLogsByTrip(trip);
             if (rideLogs.isEmpty()) {
                 response.put("success", false);
-                response.put("message", "🚍 Không có hành khách nào trên xe.");
+                response.put("message", "🚍 Không có hành khách nào trong chuyến.");
                 return ResponseEntity.ok(response);
             }
-
-            // 🔹 Trả về danh sách hành khách
+    
             List<Map<String, Object>> passengerList = rideLogs.stream().map(ride -> {
                 Map<String, Object> passengerData = new HashMap<>();
                 passengerData.put("passengerId", ride.getUser().getId());
@@ -135,10 +151,10 @@ public class DriverController {
                 passengerData.put("ticketId", ride.getTicketId());
                 passengerData.put("rideTime", ride.getRideTime());
                 passengerData.put("status", ride.getStatus());
-                passengerData.put("route", ride.getRoute()); // Lộ trình
+                passengerData.put("route", ride.getRoute());
                 return passengerData;
             }).toList();
-
+    
             response.put("success", true);
             response.put("passengers", passengerList);
             return ResponseEntity.ok(response);
@@ -148,48 +164,180 @@ public class DriverController {
             return ResponseEntity.status(500).body(response);
         }
     }
-
-
     
-    @GetMapping("/ride-history")
-public ResponseEntity<?> getUserRideHistory(@RequestHeader("Authorization") String token) {
+
+    // ✅ API trả về danh sách các chuyến đi của tài xế và hành khách của từng chuyến
+   @GetMapping("/ride-history")
+public ResponseEntity<?> getDriverRideHistory(@RequestHeader("Authorization") String token) {
     try {
         String jwt = token.replace("Bearer ", "");
         String email = jwtUtil.extractEmail(jwt);
-        User user = userService.findByEmail(email);
+        User driver = userService.findByEmail(email);
 
-        if (user == null) {
-            return ResponseEntity.status(404).body("User not found");
+        if (driver == null || !driver.getRole().equals(User.Role.DRIVER)) {
+            return ResponseEntity.status(401).body("Tài xế không hợp lệ");
         }
 
-        List<RideLog> rideLogs = rideLogService.getRideLogsByUser(user);
+        // Lấy các chuyến đi của tài xế
+        List<Trip> trips = rideLogService.getTripsByDriver(driver);
 
-        List<Map<String, Object>> response = rideLogs.stream().map(rideLog -> {
-            Map<String, Object> logData = new HashMap<>();
-            logData.put("id", rideLog.getId());
+        AtomicInteger totalPassengers = new AtomicInteger(0); // ✅ Sử dụng AtomicInteger
 
-            // Thêm thông tin tài xế
-            if (rideLog.getDriver() != null) {
-                logData.put("driverId", rideLog.getDriver().getId()); // ID tài xế
-                logData.put("driverName", rideLog.getDriver().getFullName()); // Tên tài xế
-            } else {
-                logData.put("driverId", null); // Nếu không có tài xế
-                logData.put("driverName", "Unknown");
-            }
+        // Trả về dữ liệu chi tiết chuyến đi
+        List<Map<String, Object>> response = trips.stream().map(trip -> {
+            Map<String, Object> tripData = new HashMap<>();
+            tripData.put("tripId", trip.getId());
+            tripData.put("startTime", trip.getStartTime());
+            tripData.put("endTime", trip.getEndTime());
+            tripData.put("route", trip.getDriver().getBus().getRoute());
 
-            // Thêm các thông tin khác
-            logData.put("ticketId", rideLog.getTicketId());
-            logData.put("route", rideLog.getRoute());
-            logData.put("rideTime", rideLog.getRideTime());
-            logData.put("status", rideLog.getStatus());
+            // Lấy hành khách trong chuyến này
+            List<RideLog> rideLogs = rideLogService.getRideLogsByTrip(trip);
 
-            return logData;
+            // ✅ Cộng dồn số hành khách
+            totalPassengers.addAndGet(rideLogs.size());
+
+            List<Map<String, Object>> passengers = rideLogs.stream().map(ride -> {
+                Map<String, Object> p = new HashMap<>();
+                p.put("passengerId", ride.getUser().getId());
+                p.put("passengerName", ride.getUser().getFullName());
+                p.put("ticketId", ride.getTicketId());
+                p.put("rideTime", ride.getRideTime());
+                p.put("status", ride.getStatus());
+                return p;
+            }).toList();
+
+            tripData.put("passengers", passengers);
+            return tripData;
         }).toList();
 
-        return ResponseEntity.ok(response);
+        // Gói kết quả trả về
+        Map<String, Object> finalResponse = new HashMap<>();
+        finalResponse.put("totalTrips", trips.size());
+        finalResponse.put("totalPassengers", totalPassengers.get()); // ✅ Lấy giá trị từ AtomicInteger
+        finalResponse.put("tripDetails", response);
+
+        return ResponseEntity.ok(finalResponse);
     } catch (Exception e) {
         return ResponseEntity.status(500).body("Lỗi khi lấy lịch sử chuyến đi: " + e.getMessage());
     }
 }
-    
+
+    // mở chuyến
+@PostMapping("/open-trip")
+public ResponseEntity<?> openTrip(@RequestHeader("Authorization") String token) {
+    try {
+        String jwt = token.replace("Bearer ", "");
+        String driverEmail = jwtUtil.extractEmail(jwt);
+        User driver = userService.findByEmail(driverEmail);
+
+        if (driver == null || !driver.getRole().equals(User.Role.DRIVER)) {
+            return ResponseEntity.status(401).body("❌ Tài xế không hợp lệ hoặc chưa đăng nhập");
+        }
+
+        // Kiểm tra tài xế đã có chuyến mở chưa
+        Optional<Trip> existingTrip = rideLogService.getOpenTripByDriver(driver);
+        if (existingTrip.isPresent()) {
+            return ResponseEntity.badRequest().body("❌ Đã có chuyến mở. Vui lòng đóng chuyến trước đó.");
+        }
+
+        // ✅ Gán thông tin bus từ driver
+        Bus bus = driver.getBus();
+        if (bus == null) {
+            return ResponseEntity.badRequest().body("❌ Tài xế chưa được gán với xe buýt nào.");
+        }
+
+        Trip newTrip = new Trip();
+        newTrip.setDriver(driver);
+        newTrip.setBus(bus); // ✅ Gán bus cho chuyến đi
+        newTrip.setRoute(bus.getRoute()); // (nếu bạn muốn lưu route từ bus vào trip)
+        newTrip.setStartTime(LocalDateTime.now());
+        newTrip.setStatus(Trip.Status.OPEN);
+
+        rideLogService.saveTrip(newTrip);
+
+        return ResponseEntity.ok(Map.of(
+        "success", true,
+        "message", "✅ Mở chuyến thành công!"
+        ));
+
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body(Map.of(
+        "success", false,
+        "message", "❌ Lỗi khi mở chuyến: " + e.getMessage()
+));
+
+    }
+}
+
+
+
+@PostMapping("/close-trip")
+public ResponseEntity<?> closeTrip(@RequestHeader("Authorization") String token) {
+    try {
+        String jwt = token.replace("Bearer ", "");
+        String driverEmail = jwtUtil.extractEmail(jwt);
+        User driver = userService.findByEmail(driverEmail);
+
+        if (driver == null || !driver.getRole().equals(User.Role.DRIVER)) {
+            return ResponseEntity.status(401).body("❌ Tài xế không hợp lệ hoặc chưa đăng nhập");
+        }
+
+        Optional<Trip> tripOpt = rideLogService.getOpenTripByDriver(driver);
+        if (tripOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("❌ Không có chuyến đang mở để đóng.");
+        }
+
+        Trip trip = tripOpt.get();
+
+        // ✅ Chuyển từ Date -> LocalDateTime
+        LocalDateTime now = new Date().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+        trip.setEndTime(now);
+
+        trip.setStatus(Trip.Status.CLOSED);
+        rideLogService.saveTrip(trip);
+
+        return ResponseEntity.ok(Map.of(
+        "success", true,
+        "message", "✅ Đã đóng chuyến thành công!"
+));
+
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body(Map.of(
+        "success", false,
+        "message", "❌ Lỗi khi đóng chuyến: " + e.getMessage()
+));
+
+    }
+}
+@GetMapping("/trip-status")
+public ResponseEntity<?> getTripStatus(@RequestHeader("Authorization") String token) {
+    try {
+        String jwt = token.replace("Bearer ", "");
+        String driverEmail = jwtUtil.extractEmail(jwt);
+        User driver = userService.findByEmail(driverEmail);
+
+        if (driver == null || !driver.getRole().equals(User.Role.DRIVER)) {
+            return ResponseEntity.status(401).body(Map.of(
+                "success", false,
+                "message", "Tài xế không hợp lệ hoặc chưa đăng nhập"
+            ));
+        }
+
+        Optional<Trip> openTrip = rideLogService.getOpenTripByDriver(driver);
+        boolean isTripOpen = openTrip.isPresent();
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "tripOpen", isTripOpen,
+            "message", isTripOpen ? "Chuyến đang mở" : "Không có chuyến đang mở"
+        ));
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body(Map.of(
+            "success", false,
+            "message", "Lỗi hệ thống: " + e.getMessage()
+        ));
+    }
+}
+
 }

@@ -85,45 +85,50 @@ public class UserController {
             return ResponseEntity.status(400).body("Cập nhật thất bại: " + e.getMessage());
         }
     }
-    // ✅ API lấy danh sách vé của người dùng
-    @Autowired // ✅ Thêm Autowired cho QRService
+    @Autowired
     private QRService qrService;
-   @GetMapping("/tickets")
-public ResponseEntity<?> getUserTickets(@RequestHeader("Authorization") String token) {
-    try {
-        String jwt = token.replace("Bearer ", ""); // Lấy token từ header
-        String email = jwtUtil.extractEmail(jwt); // Giải mã token để lấy email
-        User user = userService.findByEmail(email);
-
-        if (user == null) {
-            return ResponseEntity.status(404).body("User not found");
+    
+    @GetMapping("/tickets")
+    public ResponseEntity<?> getUserTickets(@RequestHeader("Authorization") String token) {
+        try {
+            String jwt = token.replace("Bearer ", ""); // Lấy token từ header
+            String email = jwtUtil.extractEmail(jwt); // Giải mã token để lấy email
+            User user = userService.findByEmail(email);
+    
+            if (user == null) {
+                return ResponseEntity.status(404).body("User not found");
+            }
+    
+            List<Ticket> tickets = ticketService.getTicketsByUser(user);
+            List<Map<String, Object>> ticketResponses = new ArrayList<>();
+    
+            for (Ticket ticket : tickets) {
+                if (Boolean.TRUE.equals(ticket.getIsHidden())) {
+                    continue; // Bỏ qua vé bị ẩn
+                }
+    
+                Map<String, Object> ticketData = new HashMap<>();
+                ticketData.put("id", ticket.getId());
+                ticketData.put("ticketType", ticket.getTicketType());
+                ticketData.put("price", ticket.getPrice());
+                ticketData.put("remainingRides", ticket.getRemainingRides());
+                ticketData.put("purchaseDate", ticket.getPurchaseDate());
+                ticketData.put("expiryDate", ticket.getExpiryDate());
+    
+                // ✅ Tạo mã QR từ thông tin vé
+                String qrContent = "TicketID: " + ticket.getId() + ", UserID: " + user.getId();
+                String qrBase64 = qrService.generateQRCode(qrContent);
+                ticketData.put("qrCode", qrBase64);
+    
+                ticketResponses.add(ticketData);
+            }
+    
+            return ResponseEntity.ok(ticketResponses);
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body("Lỗi khi lấy danh sách vé: " + e.getMessage());
         }
-
-        List<Ticket> tickets = ticketService.getTicketsByUser(user);
-        List<Map<String, Object>> ticketResponses = new ArrayList<>();
-
-        for (Ticket ticket : tickets) {
-            Map<String, Object> ticketData = new HashMap<>();
-            ticketData.put("id", ticket.getId());
-            ticketData.put("ticketType", ticket.getTicketType());
-            ticketData.put("price", ticket.getPrice());
-            ticketData.put("remainingRides", ticket.getRemainingRides());
-            ticketData.put("purchaseDate", ticket.getPurchaseDate());
-            ticketData.put("expiryDate", ticket.getExpiryDate());
-
-            // ✅ Tạo mã QR từ thông tin vé
-            String qrContent = "TicketID: " + ticket.getId() + ", UserID: " + user.getId();
-            String qrBase64 = qrService.generateQRCode(qrContent);
-            ticketData.put("qrCode", qrBase64);
-
-            ticketResponses.add(ticketData);
-        }
-
-        return ResponseEntity.ok(ticketResponses);
-    } catch (Exception e) {
-        return ResponseEntity.status(400).body("Lỗi khi lấy danh sách vé: " + e.getMessage());
     }
-}
+    
 // ✅ API lấy lịch sử chuyến đi của người dùng
 @Autowired
 private RideLogService rideLogService;

@@ -97,8 +97,8 @@ public class TicketService {
         return ticketRepository.save(ticket);
     }
 
-    // ✅ Xóa vé
-    public void deleteTicket(Long ticketId) {
-        ticketRepository.deleteById(ticketId);
-    }
+//     // ✅ Xóa vé
+//     public void deleteTicket(Long ticketId) {
+//         ticketRepository.deleteById(ticketId);
+//     }
 }
