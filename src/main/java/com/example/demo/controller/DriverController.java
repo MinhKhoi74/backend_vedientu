@@ -101,6 +101,7 @@ public class DriverController {
     
             response.put("success", true);
             response.put("message", "✅ Vé hợp lệ! Hành khách có thể lên xe.");
+            response.put("tripId", openTrip.get().getId());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);
@@ -257,6 +258,7 @@ public ResponseEntity<?> openTrip(@RequestHeader("Authorization") String token) 
         rideLogService.saveTrip(newTrip);
 
         return ResponseEntity.ok(Map.of(
+        "tripId", newTrip.getId(),
         "success", true,
         "message", "✅ Mở chuyến thành công!"
         ));
