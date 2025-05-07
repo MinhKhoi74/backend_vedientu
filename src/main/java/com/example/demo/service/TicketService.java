@@ -50,7 +50,7 @@ public class TicketService {
 
     // ✅ Lấy danh sách vé của một người dùng
     public List<Ticket> getTicketsByUser(User user) {
-        return ticketRepository.findByUser(user);
+        return ticketRepository.findByUserOrderByPurchaseDateDesc(user);
     }
 
     // ✅ Lấy mã QR của vé dưới dạng hình ảnh Base64

@@ -16,7 +16,7 @@ public class TransactionService {
     private TransactionRepository transactionRepository;
 
     public List<TransactionResponse> getAllTransactions() {
-        List<Transaction> transactions = transactionRepository.findAll();
+        List<Transaction> transactions = transactionRepository.findAllByOrderByTransactionDateDesc();
 
         return transactions.stream().map(t -> TransactionResponse.builder()
                 .id(t.getId())
@@ -31,7 +31,7 @@ public class TransactionService {
     }
 
     public List<TransactionResponse> getTransactionsByUserId(Long userId) {
-        List<Transaction> transactions = transactionRepository.findByUserId(userId);
+        List<Transaction> transactions = transactionRepository.findByUserIdOrderByTransactionDateDesc(userId);
 
         return transactions.stream().map(t -> TransactionResponse.builder()
                 .id(t.getId())

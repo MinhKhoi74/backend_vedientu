@@ -24,7 +24,7 @@ public class UserService {
     
      // ✅ Lấy tất cả người dùng
      public List<User> getAllUsers() {
-        return userRepository.findAll();
+        return userRepository.findAllByOrderByIdDesc();
     }
      // ✅ Cập nhật thông tin người dùng
     public void updateUser(User user) {

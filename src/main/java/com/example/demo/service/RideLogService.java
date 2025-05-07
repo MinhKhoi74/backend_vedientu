@@ -33,7 +33,7 @@ public class RideLogService {
 
     // Lấy tất cả các chuyến đi theo tài xế
     public List<Trip> getTripsByDriver(User driver) {
-        return tripRepository.findAllByDriver(driver);
+        return tripRepository.findAllByDriverOrderByStartTimeDesc(driver);
     }
 
     // Lấy chuyến đi đang mở theo tài xế
@@ -47,7 +47,7 @@ public class RideLogService {
 
     // Lấy tất cả các log đi theo chuyến
     public List<RideLog> getRideLogsByTrip(Trip trip) {
-        return rideLogRepository.findByTrip(trip);
+        return rideLogRepository.findByTripOrderByRideTimeDesc(trip);
     }
     // Lưu RideLog và trả về RideLogResponse
     public RideLogResponse saveRideLog(User user, Ticket ticket, User driver, Bus bus, Trip trip) {
@@ -75,11 +75,11 @@ public class RideLogService {
     
 
     public List<RideLog> getRideLogsByUser(User user) {
-        return rideLogRepository.findByUser(user);
+        return rideLogRepository.findByUserOrderByRideTimeDesc(user);
     }
 
     public List<RideLog> getPassengersByDriver(User driver) {
-        return rideLogRepository.findByDriver(driver);
+        return rideLogRepository.findByDriverOrderByRideTimeDesc(driver);
     }
 
     public RideLogResponse getRideLogDetailForUser(Long rideLogId, String token) {
