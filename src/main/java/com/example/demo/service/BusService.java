@@ -74,13 +74,23 @@ public boolean updateBus(Long id, BusRequest updatedBus) {
     return false;
 }
 
+public boolean deleteBus(Long id) {
+    Optional<Bus> optionalBus = busRepository.findById(id);
+    if (optionalBus.isPresent()) {
+        Bus bus = optionalBus.get();
 
-    // ✅ Xóa xe buýt theo ID
-    public boolean deleteBus(Long id) {
-        if (busRepository.existsById(id)) {
-            busRepository.deleteById(id);
-            return true;
+        // Gỡ liên kết tài xế nếu có
+        User driver = bus.getDriver();
+        if (driver != null) {
+            driver.setBus(null);   // Gỡ liên kết từ phía tài xế
+            userRepository.save(driver);  // Lưu cập nhật
         }
-        return false;
+
+        busRepository.delete(bus);  // Xóa xe buýt
+        return true;
     }
+    return false;
+}
+
+
 }
